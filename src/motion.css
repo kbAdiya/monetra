@@ -1,0 +1,87 @@
+:root {
+  --motion-fast: 140ms;
+  --motion-medium: 220ms;
+  --motion-exit: 160ms;
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-standard: cubic-bezier(.2, .65, .3, 1);
+}
+
+/* Small, finite transitions. Data refreshes never restart a page entrance. */
+button, input, select, a {
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease, border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease, opacity var(--motion-fast) ease, transform var(--motion-fast) var(--ease-standard);
+}
+button:active:not(:disabled) { transform: translateY(1px); }
+button:disabled { cursor: not-allowed; }
+fieldset:disabled button { cursor: wait; }
+.subscription-card { transition: border-color var(--motion-fast) ease, background-color var(--motion-fast) ease, box-shadow var(--motion-medium) ease, transform var(--motion-medium) var(--ease-out); }
+@media (hover: hover) and (pointer: fine) {
+  .subscription-card:hover { transform: translateY(-1px); }
+  .primary-button:hover { box-shadow: 0 7px 18px #be593e28; }
+}
+
+.switcher { position: relative; isolation: isolate; }
+.switcher::before { content: ''; position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 6px); border-radius: 7px; background: #d9765d; box-shadow: 0 2px 5px #9d452f24; transition: transform var(--motion-medium) var(--ease-out), background-color var(--motion-medium) ease; }
+.switcher:has(button:nth-child(2).selected)::before { transform: translateX(calc(100% + 4px)); }
+.switcher:has(.income-selected)::before { background: #4d9362; }
+.switcher button { position: relative; z-index: 1; }
+.switcher button.selected { background: transparent; box-shadow: none; }
+.subscription-picker-button svg:last-child { transition: transform var(--motion-medium) var(--ease-out); }
+.subscription-picker-button[aria-expanded="true"] svg:last-child { transform: rotate(180deg); }
+
+.page-view { outline: none; view-transition-name: monetra-page; }
+.app-shell, .auth-shell { animation: shell-enter 180ms ease both; }
+@keyframes shell-enter { from { opacity: 0; } to { opacity: 1; } }
+.page-view[data-fallback="true"] { animation: view-enter var(--motion-medium) var(--ease-out) both; }
+.auth-card { view-transition-name: monetra-auth; }
+.auth-card[data-fallback="true"] { animation: view-enter var(--motion-medium) var(--ease-out) both; }
+html[data-page-transition] { view-transition-name: none; }
+::view-transition-old(monetra-page), ::view-transition-old(monetra-auth) { animation: view-leave 100ms ease both; }
+::view-transition-new(monetra-page), ::view-transition-new(monetra-auth) { animation: view-enter var(--motion-medium) var(--ease-out) both; }
+::view-transition-group(monetra-page), ::view-transition-group(monetra-auth) { animation-duration: var(--motion-medium); animation-timing-function: var(--ease-out); }
+@keyframes view-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes view-leave { to { opacity: 0; } }
+
+.reveal { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows var(--motion-medium) var(--ease-out), opacity var(--motion-exit) ease; }
+.reveal.is-open { grid-template-rows: 1fr; opacity: 1; }
+.reveal:not(.is-open) { transition-duration: var(--motion-exit), var(--motion-exit); }
+.reveal-inner { min-height: 0; overflow: hidden; }
+.reveal.is-open > .reveal-inner { animation: reveal-enter var(--motion-medium) var(--ease-out); }
+@starting-style { .reveal.is-open { grid-template-rows: 0fr; opacity: 0; } }
+@keyframes reveal-enter { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+.payment-detail, .payment-editor, .auth-feedback { animation: reveal-enter var(--motion-medium) var(--ease-out); }
+.category-bars .bar-track i { transform-origin: left; animation: bar-enter 280ms var(--ease-out) both; }
+@keyframes bar-enter { from { transform: scaleX(.92); opacity: .5; } to { transform: scaleX(1); opacity: 1; } }
+
+.modal-dialog { width: min(460px, calc(100% - 32px)); max-width: none; max-height: calc(100dvh - 40px); padding: 0; margin: auto; border: 0; border-radius: 20px; overflow: visible; color: inherit; background: transparent; outline: none; }
+.modal-dialog::backdrop { background: rgba(42, 30, 24, .36); animation: backdrop-enter var(--motion-medium) ease both; }
+.modal-dialog .modal { width: 100%; max-height: calc(100dvh - 40px); overscroll-behavior: contain; box-shadow: 0 24px 80px #3925192e; }
+.modal-dialog.is-open .modal { animation: modal-enter var(--motion-medium) var(--ease-out) both; }
+.modal-dialog.is-closing .modal { pointer-events: none; animation: modal-exit var(--motion-exit) ease both; }
+.modal-dialog.is-closing::backdrop { animation: backdrop-exit var(--motion-exit) ease both; }
+.modal-dialog[data-native="false"][open] { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; width: 100%; height: 100%; max-height: none; padding: 20px; background: rgba(42, 30, 24, .36); border-radius: 0; }
+.modal-dialog[data-native="false"] .modal { width: min(460px, 100%); }
+.modal-error { margin: 0; padding: 15px 24px 0; color: #9f3c29; font-size: 13px; line-height: 1.6; background: #fcfaf7; }
+@keyframes modal-enter { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes modal-exit { to { opacity: 0; transform: translateY(6px) scale(.99); } }
+@keyframes backdrop-enter { from { background-color: rgba(42, 30, 24, 0); } }
+@keyframes backdrop-exit { to { background-color: rgba(42, 30, 24, 0); } }
+
+.toast { position: fixed; z-index: 25; right: 28px; bottom: 26px; display: flex; align-items: center; gap: 12px; width: max-content; max-width: min(480px, calc(100vw - 40px)); padding: 14px 14px 14px 17px; border: 1px solid #d8dfcf; border-radius: 14px; color: #405c40; background: #f9fcf4; box-shadow: 0 10px 38px #44342114; font-size: 13px; line-height: 1.55; }
+.toast-icon { display: grid; place-items: center; flex-shrink: 0; width: 27px; height: 27px; border-radius: 50%; color: #4c7a4c; background: #e7efdf; }
+.toast .icon-button { flex-shrink: 0; width: 28px; height: 28px; color: #73816a; background: transparent; }
+.toast.is-open { animation: toast-enter var(--motion-medium) var(--ease-out) both; }
+.toast.is-closing { pointer-events: none; animation: toast-exit var(--motion-exit) ease both; }
+@keyframes toast-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes toast-exit { to { opacity: 0; transform: translateY(5px); } }
+
+@media (max-width: 820px) {
+  .modal-dialog { width: calc(100% - 20px); margin: auto auto 10px; max-height: calc(100dvh - 20px); }
+  .modal-dialog .modal { max-height: calc(100dvh - 20px); border-radius: 20px; }
+  .modal-dialog[data-native="false"][open] { place-items: end center; padding: 10px; margin: 0; }
+  .toast { right: 16px; bottom: max(18px, env(safe-area-inset-bottom)); max-width: calc(100vw - 32px); font-size: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}

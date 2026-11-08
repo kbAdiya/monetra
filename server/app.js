@@ -4,6 +4,7 @@ import { resolve, extname, sep } from 'node:path';
 import { createStore } from './store.js';
 import { InputError, text, validDate, amountInMinor, validateTransaction, todayInZone, patternKey } from './domain.js';
 import { sampleTransactions } from './samples.js';
+import { createAuth } from './auth.js';
 
 async function body(req) {
   if (!req.headers['content-type']?.startsWith('application/json')) throw new InputError('Требуется JSON.',415);
@@ -17,7 +18,8 @@ function paymentInput(input) {
   if(!validDate(input.nextDate)) throw new InputError('Укажите корректную ожидаемую дату оплаты.');
   return {name,amountMinor,nextDate:input.nextDate,anchorDay:Number(input.nextDate.slice(8,10))};
 }
-export function createApp({store=createStore(), clock=()=>todayInZone(), staticDir=resolve('dist')}={}) {
+export function createApp({store=createStore(), clock=()=>todayInZone(), staticDir=resolve('dist'), authOptions={}}={}) {
+  const auth=createAuth(store,authOptions);
   const server=http.createServer(async(req,res)=>{
     const json=(status,value)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(value));};
     try {
@@ -31,11 +33,9 @@ export function createApp({store=createStore(), clock=()=>todayInZone(), staticD
         res.writeHead(200,{'Content-Type':({'':'text/html','.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.png':'image/png'})[extname(requested)]||'application/octet-stream','X-Content-Type-Options':'nosniff'});res.end(file);return;
       }
       if(url.pathname==='/api/health') return json(200,{status:'ok'});
-      // Browser requests are same-origin through Vite or the production server.
-      if(req.headers.origin && req.headers.origin!==`http://${req.headers.host}`) throw new InputError('Недопустимый источник запроса.',403);
-      const cookie=req.headers.cookie?.split(';').map(x=>x.trim()).find(x=>x.startsWith('monetra_session='))?.slice(16);
-      let id=cookie && /^[a-f0-9-]{36}$/.test(cookie) && store.user(cookie) ? cookie : null;
-      if(!id) {id=store.createUser();res.setHeader('Set-Cookie',`monetra_session=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`);}
+      const authResult=await auth.handle(req,res,url.pathname,body,clock());
+      if(authResult.handled) return json(authResult.status,authResult.data);
+      const id=authResult.id;
       if(req.method==='GET' && url.pathname==='/api/state') return json(200,store.state(id,clock()));
       if(req.method==='POST' && url.pathname==='/api/transactions') {
         const input=validateTransaction(await body(req),clock());

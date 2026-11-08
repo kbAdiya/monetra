@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight, BriefcaseBusiness, CarFront, ChevronDown, Cloud, Coffee, CreditCard, LayoutDashboard, ListFilter, Music2, Play, Plus, Search, Settings, ShoppingBasket, Sparkles, Trash2, TrendingUp, Tv, WalletCards, X, CalendarClock, Bell, Pencil, Check } from 'lucide-react';
 import { categories, subscriptionTemplates } from './data.js';
-import { request } from './api.js';
+import { request, clearAuth } from './api.js';
+import AuthScreen, { AccountSecurity, RecoveryNotice } from './Auth.jsx';
+import { Modal, PageView, Reveal, Toast, transitionView } from './Motion.jsx';
 
 const icons = { coffee: Coffee, briefcase: BriefcaseBusiness, shopping: ShoppingBasket, car: CarFront, play: Play, music: Music2, tv: Tv, cloud: Cloud };
 const money = value => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Math.abs(value))} ₸`;
@@ -31,7 +33,7 @@ function TransactionForm({ save, close, busy, today }) {
     if (ok) { setAmount(''); setName(''); setNote(''); setRecurring(false); }
   };
   const choose = template => { setKind('expense'); setCategory('Подписки'); setAmount(String(template.price)); setName(template.name); setRecurring(true); setPicker(false); };
-  return <form className="add-panel" onSubmit={submit}><fieldset disabled={busy}><div className="panel-heading"><div><span className="section-kicker">Ваша запись</span><h2>Новая операция</h2></div>{close && <button type="button" aria-label="Закрыть форму" className="icon-button" onClick={close}><X size={18} /></button>}</div><div className="switcher"><button type="button" className={kind === 'expense' ? 'selected' : ''} onClick={() => { setKind('expense'); setCategory('Еда и напитки'); setRecurring(false); }}>Расход</button><button type="button" className={kind === 'income' ? 'selected income-selected' : ''} onClick={() => { setKind('income'); setCategory('Доходы'); setRecurring(false); }}>Доход</button></div>{kind === 'expense' && <><button type="button" className="subscription-picker-button" aria-expanded={picker} onClick={() => setPicker(!picker)}><Sparkles size={16} />Подписка из готовых примеров<ChevronDown size={16} /></button>{picker && <div className="template-picker">{subscriptionTemplates.map(t => <button type="button" key={t.id} onClick={() => choose(t)}><Icon name={t.icon} small color={t.color} /><span>{t.name}<small>{money(t.price)} в месяц</small></span><Plus size={15} /></button>)}</div>}</>}<label>{kind === 'income' ? 'Источник дохода' : 'Продавец или сервис'}<input required value={name} onChange={e => setName(e.target.value)} maxLength={120} placeholder="Например, Spotify" /></label><label>Сумма<div className="input-wrap"><input type="number" required min="0.01" max="1000000000" step="0.01" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" /><span>₸</span></div></label><label>Категория<div className="select-wrap"><select value={category} onChange={e => { setCategory(e.target.value); setRecurring(e.target.value === 'Подписки'); }}>{categories.filter(c => kind === 'income' ? c === 'Доходы' : c !== 'Доходы').map(c => <option key={c}>{c}</option>)}</select><ChevronDown size={16} /></div></label><label>Дата и время<input type="datetime-local" required max={`${today}T23:59`} value={occurredAt} onChange={e => setOccurredAt(e.target.value)} /></label><label>Комментарий<input value={note} maxLength={500} onChange={e => setNote(e.target.value)} placeholder="Необязательный комментарий" /></label>{kind === 'expense' && <label className="recurring-toggle"><input type="checkbox" checked={recurring} onChange={e => setRecurring(e.target.checked)} /><span><b>Повторять каждый месяц</b><small>Подтверждаю этот повторяющийся платёж. Можно отключить независимо от категории.</small></span></label>}{error && <p className="form-error" role="alert">{error}</p>}<button className="primary-button"><Plus size={19} />{busy ? 'Сохранение…' : 'Добавить операцию'}</button></fieldset></form>;
+  return <form className="add-panel" onSubmit={submit}><fieldset disabled={busy}><div className="panel-heading"><div><span className="section-kicker">Ваша запись</span><h2>Новая операция</h2></div>{close && <button type="button" aria-label="Закрыть форму" className="icon-button" onClick={close}><X size={18} /></button>}</div><div className="switcher"><button type="button" className={kind === 'expense' ? 'selected' : ''} onClick={() => { setKind('expense'); setCategory('Еда и напитки'); setRecurring(false); }}>Расход</button><button type="button" className={kind === 'income' ? 'selected income-selected' : ''} onClick={() => { setKind('income'); setCategory('Доходы'); setRecurring(false); }}>Доход</button></div>{kind === 'expense' && <><button type="button" className="subscription-picker-button" aria-expanded={picker} onClick={() => setPicker(!picker)}><Sparkles size={16} />Подписка из готовых примеров<ChevronDown size={16} /></button><Reveal open={picker}><div className="template-picker">{subscriptionTemplates.map(t => <button type="button" key={t.id} onClick={() => choose(t)}><Icon name={t.icon} small color={t.color} /><span>{t.name}<small>{money(t.price)} в месяц</small></span><Plus size={15} /></button>)}</div></Reveal></>}<label>{kind === 'income' ? 'Источник дохода' : 'Продавец или сервис'}<input required value={name} onChange={e => setName(e.target.value)} maxLength={120} placeholder="Например, Spotify" /></label><label>Сумма<div className="input-wrap"><input type="number" required min="0.01" max="1000000000" step="0.01" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" /><span>₸</span></div></label><label>Категория<div className="select-wrap"><select value={category} onChange={e => { setCategory(e.target.value); setRecurring(e.target.value === 'Подписки'); }}>{categories.filter(c => kind === 'income' ? c === 'Доходы' : c !== 'Доходы').map(c => <option key={c}>{c}</option>)}</select><ChevronDown size={16} /></div></label><label>Дата и время<input type="datetime-local" required max={`${today}T23:59`} value={occurredAt} onChange={e => setOccurredAt(e.target.value)} /></label><label>Комментарий<input value={note} maxLength={500} onChange={e => setNote(e.target.value)} placeholder="Необязательный комментарий" /></label>{kind === 'expense' && <label className="recurring-toggle"><input type="checkbox" checked={recurring} onChange={e => setRecurring(e.target.checked)} /><span><b>Повторять каждый месяц</b><small>Подтверждаю этот повторяющийся платёж. Можно отключить независимо от категории.</small></span></label>}{error && <p className="form-error" role="alert">{error}</p>}<button className="primary-button"><Plus size={19} />{busy ? 'Сохранение…' : 'Добавить операцию'}</button></fieldset></form>;
 }
 
 function PaymentEditor({ item, submit, cancel, busy, suggestion }) {
@@ -42,13 +44,13 @@ function PaymentEditor({ item, submit, cancel, busy, suggestion }) {
 
 function Suggestions({ items, review, busy, today }) {
   const [editing, setEditing] = useState(null);
-  return <section className="surface"><div className="section-head"><div><span className="section-kicker">Анализ истории</span><h2>Возможные подписки</h2></div><Sparkles size={20} className="sparkle" /></div><p className="muted rule-note">Один продавец, одинаковая сумма, минимум три последовательных месяца. Допуск даты — 3 дня с учётом конца месяца. Это предположение: подтвердите или исправьте его.</p>{items.length ? items.map(item => <article className="suggestion" key={item.key}><div className="suggestion-head"><div><h3>{item.name}<em className="recurring-badge">Не подтверждено</em></h3><p>{item.occurrences} месяца · {dueLabel(item.nextDate, today)}</p></div><strong className="negative">{money(item.price)}</strong></div><details><summary>Платежи, на которых основано предложение</summary><ul>{item.evidence.map(tx => <li key={tx.id}>{dateLabel(tx.occurredAt)} · {money(tx.amount)}</li>)}</ul></details>{editing === item.key ? <PaymentEditor item={item} busy={busy} suggestion cancel={() => setEditing(null)} submit={async correction => { if (await review(item, 'confirm', correction)) setEditing(null); }} /> : <div className="action-row"><button disabled={busy} className="secondary-button confirm-button" onClick={() => review(item, 'confirm')}><Check size={15} />Подтвердить</button><button disabled={busy} className="secondary-button" onClick={() => setEditing(item.key)}><Pencil size={14} />Исправить</button><button disabled={busy} className="text-button" onClick={() => review(item, 'reject')}>Отклонить</button></div>}</article>) : <div className="empty">Новых предложений пока нет. Добавьте историю платежей или загрузите демонстрационные данные.</div>}</section>;
+  return <section className="surface"><div className="section-head"><div><span className="section-kicker">Анализ истории</span><h2>Возможные подписки</h2></div><Sparkles size={20} className="sparkle" /></div><p className="muted rule-note">Заметили похожие платежи. Проверьте их, прежде чем добавить в расписание.</p><details className="detection-rule"><summary>Как мы определяем повтор</summary><p>Один продавец, одинаковая сумма и минимум три последовательных месяца. Допуск даты — 3 дня с учётом конца месяца.</p></details>{items.length ? items.map(item => <article className="suggestion" key={item.key}><div className="suggestion-head"><div><h3>{item.name}<em className="recurring-badge">Не подтверждено</em></h3><p>{item.occurrences} месяца · {dueLabel(item.nextDate, today)}</p></div><strong className="negative">{money(item.price)}</strong></div><details><summary>Платежи, на которых основано предложение</summary><ul>{item.evidence.map(tx => <li key={tx.id}>{dateLabel(tx.occurredAt)} · {money(tx.amount)}</li>)}</ul></details>{editing === item.key ? <PaymentEditor item={item} busy={busy} suggestion cancel={() => setEditing(null)} submit={async correction => { if (await review(item, 'confirm', correction)) setEditing(null); }} /> : <div className="action-row"><button disabled={busy} className="secondary-button confirm-button" onClick={() => review(item, 'confirm')}><Check size={15} />Подтвердить</button><button disabled={busy} className="secondary-button" onClick={() => setEditing(item.key)}><Pencil size={14} />Исправить</button><button disabled={busy} className="text-button" onClick={() => review(item, 'reject')}>Отклонить</button></div>}</article>) : <div className="empty">Новых предложений пока нет. Добавьте историю платежей или загрузите демонстрационные данные.</div>}</section>;
 }
 
 function Subscriptions({ state, update, remove, busy, compact = false }) {
   const [selectedId, setSelectedId] = useState(null), [editing, setEditing] = useState(false);
   const selected = state.subscriptions.find(x => x.id === selectedId);
-  return <section className="surface subscriptions"><div className="section-head"><div><span className="section-kicker">Подтверждено вами</span><h2>Ближайшие списания</h2></div><CalendarClock size={20} className="sparkle" /></div><p className="muted">Ожидаемые даты — прогноз. Monetra не списывает деньги и не отменяет услуги.</p><div className="upcoming-total"><span>Прогноз на следующие 30 дней</span><strong>−{money(state.forecastTotal)}</strong></div>{state.subscriptions.length ? <div className="subscription-grid">{state.subscriptions.map(item => <button className={`subscription-card ${dayDiff(item.nextDate, state.today) < 0 ? 'overdue' : ''}`} key={item.id} onClick={() => { setSelectedId(item.id); setEditing(false); }}><Icon name="play" small /><div><strong>{item.name}</strong><span>{dueLabel(item.nextDate, state.today)}</span></div><strong className="subscription-price">−{money(item.price)}</strong></button>)}</div> : <div className="empty">Подтвердите возможную подписку или включите повтор при добавлении операции.</div>}{selected && <div className="payment-detail"><button aria-label="Закрыть подробности" className="icon-button" onClick={() => setSelectedId(null)}><X size={16} /></button><span className="section-kicker">Повторяющийся платёж</span><h3>{selected.name}</h3>{editing ? <PaymentEditor key={selected.id} item={selected} busy={busy} cancel={() => setEditing(false)} submit={async values => { if (await update(selected.id, values)) setEditing(false); }} /> : <><p><b>Следующая ожидаемая оплата:</b> {dateLabel(selected.nextDate)}</p><p><b>Сумма:</b> −{money(selected.price)}</p><p><b>Повтор:</b> каждый месяц, {selected.anchorDay}-го числа; в коротком месяце — в последний день.</p><p><b>Напоминания:</b> {selected.reminderEnabled ? 'включены' : 'выключены'}</p>{dayDiff(selected.nextDate, state.today) < 0 && <p className="negative">Дата прошла. Проверьте платёж и исправьте ожидаемую дату при необходимости.</p>}<div className="action-row"><button disabled={busy} className="secondary-button" onClick={() => setEditing(true)}><Pencil size={14} />Изменить</button><button disabled={busy} className="text-button" onClick={() => remove(selected.id)}>Убрать из повторяющихся</button></div></>}</div>}{!compact && <p className="muted footer-note">Удаление операции из истории не отменяет подтверждённое вами расписание. Его можно убрать отдельно.</p>}</section>;
+  return <section className="surface subscriptions"><div className="section-head"><div><span className="section-kicker">Подтверждено вами</span><h2>Ближайшие списания</h2></div><CalendarClock size={20} className="sparkle" /></div><p className="muted">Ожидаемые даты — прогноз. Monetra не списывает деньги и не отменяет услуги.</p><div className="upcoming-total"><span>Прогноз на следующие 30 дней</span><strong>−{money(state.forecastTotal)}</strong></div>{state.subscriptions.length ? <div className="subscription-grid">{state.subscriptions.map(item => <button className={`subscription-card ${dayDiff(item.nextDate, state.today) < 0 ? 'overdue' : ''}`} key={item.id} aria-pressed={selectedId === item.id} onClick={() => { setSelectedId(item.id); setEditing(false); }}><Icon name="play" small /><div><strong>{item.name}</strong><span>{dueLabel(item.nextDate, state.today)}</span></div><strong className="subscription-price">−{money(item.price)}</strong></button>)}</div> : <div className="empty">Подтвердите возможную подписку или включите повтор при добавлении операции.</div>}<Reveal open={Boolean(selected)}>{selected && <div className="payment-detail" key={selected.id}><button aria-label="Закрыть подробности" className="icon-button" onClick={() => setSelectedId(null)}><X size={16} /></button><span className="section-kicker">Повторяющийся платёж</span><h3>{selected.name}</h3>{editing ? <PaymentEditor key={selected.id} item={selected} busy={busy} cancel={() => setEditing(false)} submit={async values => { if (await update(selected.id, values)) setEditing(false); }} /> : <><p><b>Следующая ожидаемая оплата:</b> {dateLabel(selected.nextDate)}</p><p><b>Сумма:</b> −{money(selected.price)}</p><p><b>Повтор:</b> каждый месяц, {selected.anchorDay}-го числа; в коротком месяце — в последний день.</p><p><b>Напоминания:</b> {selected.reminderEnabled ? 'включены' : 'выключены'}</p>{dayDiff(selected.nextDate, state.today) < 0 && <p className="negative">Дата прошла. Проверьте платёж и исправьте ожидаемую дату при необходимости.</p>}<div className="action-row"><button disabled={busy} className="secondary-button" onClick={() => setEditing(true)}><Pencil size={14} />Изменить</button><button disabled={busy} className="text-button" onClick={() => remove(selected.id)}>Убрать из повторяющихся</button></div></>}</div>}</Reveal>{!compact && <p className="muted footer-note">Удаление операции из истории не отменяет подтверждённое вами расписание. Его можно убрать отдельно.</p>}</section>;
 }
 
 function Reminders({ state }) {
@@ -73,7 +75,7 @@ function Dashboard({ state, actions, busy, go }) {
 function Operations({ transactions, remove, busy, open }) {
   const [query, setQuery] = useState(''), [filter, setFilter] = useState('Все');
   const items = transactions.filter(x => (filter === 'Все' || x.category === filter) && `${x.name} ${x.note} ${x.category}`.toLocaleLowerCase('ru-RU').includes(query.trim().toLocaleLowerCase('ru-RU')));
-  return <><div className="page-title"><span className="section-kicker">История</span><h1>Все операции</h1><p>Ищите, фильтруйте и удаляйте записи.</p></div><button className="secondary-button page-add" onClick={open}><Plus size={17} />Добавить операцию</button><section className="surface all-transactions"><div className="filter-row"><label className="search"><Search size={17} /><input aria-label="Поиск по операциям" value={query} onChange={e => setQuery(e.target.value)} placeholder="Поиск по операциям" /></label><label className="filter-select"><ListFilter size={17} /><select aria-label="Фильтр по категории" value={filter} onChange={e => setFilter(e.target.value)}><option>Все</option>{categories.map(c => <option key={c}>{c}</option>)}</select></label></div>{items.length ? items.map(x => <Row key={x.id} item={x} remove={remove} busy={busy} />) : <div className="empty">Ничего не найдено.</div>}</section></>;
+  return <><div className="page-title"><span className="section-kicker">История</span><h1>Все операции</h1><p>Ищите, фильтруйте и удаляйте записи.</p></div><button className="secondary-button page-add" onClick={open}><Plus size={17} />Добавить операцию</button><section className="surface all-transactions"><div className="filter-row"><label className="search"><Search size={17} /><input aria-label="Поиск по операциям" value={query} onChange={e => setQuery(e.target.value)} placeholder="Поиск по операциям" /></label><label className="filter-select"><ListFilter size={17} /><select aria-label="Фильтр по категории" value={filter} onChange={e => setFilter(e.target.value)}><option>Все</option>{categories.map(c => <option key={c}>{c}</option>)}</select></label></div><div className="results-summary"><span>Найдено операций: {items.length}</span>{(query || filter !== 'Все') && <button type="button" className="text-button" onClick={() => { setQuery(''); setFilter('Все'); }}>Сбросить фильтры</button>}</div>{items.length ? items.map(x => <Row key={x.id} item={x} remove={remove} busy={busy} />) : <div className="empty">Ничего не найдено.</div>}</section></>;
 }
 
 function Analytics({ state }) {
@@ -90,32 +92,118 @@ function Analytics({ state }) {
   return <><div className="page-title"><span className="section-kicker">Ваши данные</span><h1>Аналитика расходов</h1><p>Последние 7 дней, текущий календарный месяц или год.</p></div><section className="surface analytics"><div className="period-tabs">{[['week','Неделя'],['month','Месяц'],['year','Год']].map(([id,label])=><button key={id} className={period===id?'active':''} onClick={()=>setPeriod(id)}>{label}</button>)}</div><div className="metrics"><div><span>Расходы</span><strong className="negative">−{money(total)}</strong></div><div><span>Доходы</span><strong className="positive">+{money(income)}</strong></div><div><span>Осталось</span><strong>{signedMoney(income-total)}</strong></div></div><div className="recurring-insight"><span>Прогноз подтверждённых платежей на 30 дней</span><strong>−{money(state.forecastTotal)}</strong><small>Каждое расписание учитывается один раз. Неподтверждённые и просроченные даты в прогноз не входят.</small></div><div className="next-payment-list"><h2>Следующие оплаты</h2>{state.subscriptions.length ? state.subscriptions.map(x=><div key={x.id}><span>{x.name}<small>{dueLabel(x.nextDate,state.today)}</small></span><strong>−{money(x.price)}</strong></div>) : <p className="muted">Пока нет подтверждённых повторяющихся платежей.</p>}</div><h2>Расходы по категориям</h2>{groups.length ? <div className="category-bars">{groups.map(([category,minor])=><div key={category}><span>{category}</span><div className="bar-track"><i style={{width:`${minor/100/total*100}%`}} /></div><strong>{money(minor/100)}</strong></div>)}</div> : <div className="empty">За этот период расходов нет.</div>}</section></>;
 }
 
-function SettingsPage({ state, save, busy, importLocal }) {
+function SettingsPage({ state, save, busy, importLocal, onAuthResult, onLogout, onSecurityBusy }) {
   const [name,setName]=useState(state.profile.name), [days,setDays]=useState(state.profile.reminderDays);
   const legacy=legacyData();
-  return <><div className="page-title"><span className="section-kicker">Профиль</span><h1>Настройки</h1><p>Настройки и операции сохраняются на сервере для этого браузера.</p></div><form className="surface settings-form" onSubmit={e=>{e.preventDefault();save({name,reminderDays:Number(days)});}}><fieldset disabled={busy}><label>Ваше имя<input required value={name} maxLength={40} onChange={e=>setName(e.target.value)} /></label><label>Напоминать за сколько дней<input type="number" min="0" max="30" required value={days} onChange={e=>setDays(e.target.value)} /></label><p className="muted footer-note">0 — только в день оплаты. Напоминания появляются внутри приложения, когда оно открыто.</p><button className="primary-button">Сохранить настройки</button></fieldset></form>{Array.isArray(legacy.transactions) && legacy.transactions.length > 0 && <section className="surface import-panel"><h2>Операции из прежней версии</h2><p>В этом браузере найдено {legacy.transactions.length} записей. Перенесите их в базу данных. Исходная история в браузере сохранится; повторный перенос не создаёт копий.</p><button disabled={busy} className="secondary-button" onClick={()=>importLocal(legacy.transactions)}>Перенести операции</button></section>}<p className="muted footer-note">Локальный прототип без входа в аккаунт. Другой браузер получит отдельную историю. Синхронизация между устройствами пока не реализована.</p></>;
+  return <><div className="page-title"><span className="section-kicker">Профиль</span><h1>Настройки</h1><p>Настройки и операции привязаны к вашему аккаунту.</p></div><form className="surface settings-form" onSubmit={e=>{e.preventDefault();save({name,reminderDays:Number(days)});}}><fieldset disabled={busy}><label>Ваше имя<input required value={name} maxLength={40} onChange={e=>setName(e.target.value)} /></label><label>Напоминать за сколько дней<input type="number" min="0" max="30" required value={days} onChange={e=>setDays(e.target.value)} /></label><p className="muted footer-note">0 — только в день оплаты. Напоминания появляются внутри приложения, когда оно открыто.</p><button className="primary-button">Сохранить настройки</button></fieldset></form><AccountSecurity email={state.profile.email} onResult={onAuthResult} onLogout={onLogout} busy={busy} onBusyChange={onSecurityBusy} />{Array.isArray(legacy.transactions) && legacy.transactions.length > 0 && <section className="surface import-panel"><h2>Операции из прежней версии</h2><p>В этом браузере найдено {legacy.transactions.length} записей. Перенесите их в текущий аккаунт. Исходная история в браузере сохранится; повторный перенос не создаёт копий.</p><button disabled={busy} className="secondary-button" onClick={()=>importLocal(legacy.transactions)}>Перенести операции</button></section>}</>;
 }
 
 export default function App() {
-  const [state,setState]=useState(null), [page,setPage]=useState('dashboard'), [modal,setModal]=useState(false);
-  const [busy,setBusy]=useState(false), [error,setError]=useState(''), [notice,setNotice]=useState('');
-  const pending=useRef(false), revision=useRef(0);
-  const refresh=async()=>{const version=++revision.current;try{const data=await request('/state');if(version===revision.current&&!pending.current){setState(data);setError('');}}catch(e){if(version===revision.current)setError(e.message);}};
-  useEffect(()=>{refresh();const timer=setInterval(refresh,60000);window.addEventListener('focus',refresh);return()=>{clearInterval(timer);window.removeEventListener('focus',refresh);revision.current++;};},[]);
-  useEffect(()=>{if(!modal)return;const handler=e=>{if(e.key==='Escape'&&!pending.current)setModal(false);};document.addEventListener('keydown',handler);return()=>document.removeEventListener('keydown',handler);},[modal]);
-  const mutate=async(path,method,body,message)=>{
-    if(pending.current)return false;
-    pending.current=true;revision.current++;setBusy(true);setError('');setNotice('');
-    try{setState(await request(path,{method,body}));setNotice(message);return true;}catch(e){setError(e.message);return false;}finally{pending.current=false;setBusy(false);}
+  const [state, setState] = useState(null), [page, setPage] = useState('dashboard'), [modal, setModal] = useState(false);
+  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
+  const [authStatus, setAuthStatus] = useState('loading'), [legacy, setLegacy] = useState({});
+  const [authMessage, setAuthMessage] = useState(''), [recoveryCode, setRecoveryCode] = useState(null);
+  const pending = useRef(false), revision = useRef(0), requestedPage = useRef('dashboard');
+  const pages = [['dashboard', 'Обзор', LayoutDashboard], ['operations', 'Операции', CreditCard], ['recurring', 'Повторяющиеся', CalendarClock], ['analytics', 'Аналитика', TrendingUp], ['settings', 'Настройки', Settings]];
+
+  function applyState(data) {
+    const { recoveryCode: code, csrfToken, ...finance } = data;
+    setState(finance);
+    if (code) setRecoveryCode(code);
+  }
+  function endSession(message) {
+    revision.current++;
+    clearAuth(); setState(null); setModal(false); setPage('dashboard'); requestedPage.current = 'dashboard';
+    setAuthStatus('guest'); setRecoveryCode(null); setError(''); setNotice(''); setAuthMessage(message || '');
+  }
+  function authenticated(data) {
+    revision.current++; applyState(data); setAuthStatus('authenticated');
+    setAuthMessage(''); setError(''); setNotice(''); setPage('dashboard'); requestedPage.current = 'dashboard';
+  }
+  async function refresh() {
+    if (pending.current) return;
+    const version = ++revision.current;
+    try {
+      const session = await request('/auth/session');
+      if (version !== revision.current || pending.current) return;
+      if (!session.user) { setLegacy(session); endSession(); return; }
+      const data = await request('/state');
+      if (version === revision.current && !pending.current) { applyState(data); setAuthStatus('authenticated'); setError(''); }
+    } catch (e) {
+      if (version === revision.current) {
+        if (e.status === 401) endSession('Сеанс завершён. Войдите снова.'); else setError(e.message);
+      }
+    }
+  }
+  useEffect(() => {
+    refresh();
+    const timer = setInterval(refresh, 60000);
+    window.addEventListener('focus', refresh);
+    return () => { clearInterval(timer); window.removeEventListener('focus', refresh); revision.current++; };
+  }, []);
+  useEffect(() => {
+    document.title = authStatus === 'authenticated' ? `${pages.find(x => x[0] === page)?.[1]} · Monetra` : 'Monetra — личные финансы';
+  }, [page, authStatus]);
+
+  function navigate(next) {
+    if (next === requestedPage.current) return;
+    requestedPage.current = next;
+    transitionView(() => { setModal(false); setPage(next); });
+  }
+  async function mutate(path, method, body, message) {
+    if (pending.current) return false;
+    pending.current = true; revision.current++; setBusy(true); setError(''); setNotice('');
+    try { applyState(await request(path, { method, body })); setNotice(message); return true; }
+    catch (e) { if (e.status === 401) endSession('Сеанс завершён. Войдите снова.'); else setError(e.message); return false; }
+    finally { pending.current = false; setBusy(false); }
+  }
+  async function logout(message, all = false) {
+    if (message) { endSession(message); return; }
+    if (pending.current) return;
+    pending.current = true; revision.current++; setBusy(true);
+    try { await request(all ? '/auth/logout-all' : '/auth/logout', { method: 'POST', body: {} }); endSession(all ? 'Все сеансы завершены.' : 'Вы вышли из аккаунта.'); }
+    catch (e) { if (e.status === 401) endSession('Сеанс завершён.'); else setError(e.message); }
+    finally { pending.current = false; setBusy(false); }
+  }
+  function authBusy(value) { pending.current = value; if (value) revision.current++; setBusy(value); }
+  const actions = {
+    add: async value => { const ok = await mutate('/transactions', 'POST', value, 'Операция сохранена.'); if (ok) setModal(false); return ok; },
+    remove: id => mutate(`/transactions/${id}`, 'DELETE', undefined, 'Операция удалена.'),
+    samples: () => mutate('/samples', 'POST', {}, 'Демонстрационная история загружена.'),
+    review: (item, action, correction) => mutate('/suggestions/review', 'POST', { key: item.key, action, correction }, action === 'reject' ? 'Предложение отклонено.' : 'Повторяющийся платёж подтверждён.'),
+    update: (id, value) => mutate(`/subscriptions/${id}`, 'PATCH', value, 'Расписание обновлено.'),
+    removeSubscription: id => mutate(`/subscriptions/${id}`, 'DELETE', undefined, 'Расписание убрано. История операций сохранена.'),
   };
-  const actions={
-    add:async value=>{const ok=await mutate('/transactions','POST',value,'Операция сохранена.');if(ok)setModal(false);return ok;},
-    remove:id=>mutate(`/transactions/${id}`,'DELETE',undefined,'Операция удалена.'),
-    samples:()=>mutate('/samples','POST',{},'Примеры загружены. Повторная загрузка не создаёт копий.'),
-    review:(item,action,correction)=>mutate('/suggestions/review','POST',{key:item.key,action,correction},action==='reject'?'Предложение отклонено.':'Повторяющийся платёж подтверждён.'),
-    update:(id,value)=>mutate(`/subscriptions/${id}`,'PATCH',value,'Расписание обновлено.'),
-    removeSubscription:id=>mutate(`/subscriptions/${id}`,'DELETE',undefined,'Платёж убран из повторяющихся. История сохранена.'),
-  };
-  const pages=[['dashboard','Обзор',LayoutDashboard],['operations','Операции',CreditCard],['recurring','Повторяющиеся',CalendarClock],['analytics','Аналитика',TrendingUp],['settings','Настройки',Settings]];
-  return <div className="app-shell"><aside className="sidebar"><div className="brand"><span className="brand-mark"><i/><i/></span>Monetra</div><nav>{pages.map(([id,label,icon])=><Nav key={id} active={page===id} icon={icon} onClick={()=>setPage(id)}>{label}</Nav>)}</nav><div className="sidebar-footer"><span className="muted">Прототип · ручные и демонстрационные данные</span></div></aside><main className="main-content"><div className="mobile-top"><span className="brand">Monetra</span><button disabled={!state} className="primary-button" onClick={()=>setModal(true)}><Plus size={18}/>Операция</button></div><nav className="mobile-nav" aria-label="Разделы">{pages.map(([id,label])=><button aria-current={page===id?'page':undefined} key={id} className={page===id?'active':''} onClick={()=>setPage(id)}>{label}</button>)}</nav>{error&&<div className="status-message error-message" role="alert"><span>{error}</span><button className="text-button" onClick={refresh}>Повторить загрузку</button></div>}{notice&&<div className="status-message" role="status"><span>{notice}</span><button className="icon-button" aria-label="Скрыть уведомление" onClick={()=>setNotice('')}><X size={15}/></button></div>}{!state?<div className="empty">{error?'Не удалось подключиться к серверу.':'Загрузка данных…'}</div>:<>{page==='dashboard'&&<Dashboard state={state} actions={actions} busy={busy} go={setPage}/ >}{page==='operations'&&<Operations transactions={state.transactions} remove={actions.remove} busy={busy} open={()=>setModal(true)}/ >}{page==='recurring'&&<><div className="page-title"><span className="section-kicker">Ваши обязательства</span><h1>Повторяющиеся платежи</h1><p>Проверьте предложения, исправьте даты и управляйте напоминаниями.</p></div><Reminders state={state}/><div className="recurring-layout"><Suggestions items={state.suggestions} review={actions.review} busy={busy} today={state.today}/><Subscriptions state={state} update={actions.update} remove={actions.removeSubscription} busy={busy}/></div></>}{page==='analytics'&&<Analytics state={state}/ >}{page==='settings'&&<SettingsPage state={state} busy={busy} save={value=>mutate('/profile','PATCH',value,'Настройки сохранены.')} importLocal={transactions=>mutate('/import-local','POST',{transactions},'История перенесена в базу данных.')}/ >}</>}</main>{modal&&state&&<div className="modal-backdrop" onClick={e=>{if(e.target===e.currentTarget&&!busy)setModal(false);}}><div className="modal" role="dialog" aria-modal="true" aria-label="Новая операция"><TransactionForm save={actions.add} close={()=>setModal(false)} busy={busy} today={state.today}/></div></div>}</div>;
+
+  if (recoveryCode) return <RecoveryNotice code={recoveryCode} onContinue={() => setRecoveryCode(null)} />;
+  if (authStatus === 'guest') return <AuthScreen onAuthenticated={authenticated} legacyAvailable={legacy.legacyAvailable} legacyName={legacy.legacyName} initialMessage={authMessage} onBusyChange={authBusy} />;
+  if (authStatus === 'loading') return <div className="auth-shell"><section className="auth-card"><div className="brand"><span className="brand-mark"><i /><i /></span>Monetra</div>{error ? <><p role="alert" className="form-error">{error}</p><button className="primary-button" onClick={refresh}>Повторить загрузку</button></> : <div className="loading-state" role="status"><span className="loading-mark" /><p>Открываем ваш кабинет…</p></div>}</section></div>;
+
+  return <div className="app-shell">
+    <aside className="sidebar">
+      <div className="brand"><span className="brand-mark"><i /><i /></span>Monetra</div>
+      <span className="nav-caption">Личный кабинет</span>
+      <nav aria-label="Основная навигация">{pages.map(([id, label, icon]) => <Nav key={id} active={page === id} icon={icon} onClick={() => navigate(id)}>{label}</Nav>)}</nav>
+      <div className="sidebar-footer"><div className="sidebar-profile"><span className="profile-initial">{state?.profile.name.slice(0, 1).toUpperCase()}</span><span><strong>{state?.profile.name}</strong><small>{state?.profile.email}</small></span></div><button disabled={busy} className="secondary-button logout-button" onClick={() => logout()}>Выйти из аккаунта</button></div>
+    </aside>
+    <main className="main-content" aria-busy={busy}>
+      <div className="desktop-toolbar"><span>Личный кабинет <i>/</i> <b>{pages.find(x => x[0] === page)?.[1]}</b></span><button className="secondary-button" onClick={() => setModal(true)}><Plus size={16} />Новая операция</button></div>
+      <div className="mobile-top"><span className="brand">Monetra</span><div className="mobile-actions"><button disabled={!state} className="primary-button" onClick={() => setModal(true)}><Plus size={18} />Операция</button><button disabled={busy} className="secondary-button mobile-logout" onClick={() => logout()}>Выйти</button></div></div>
+      <nav className="mobile-nav" aria-label="Разделы">{pages.map(([id, label]) => <button aria-current={page === id ? 'page' : undefined} key={id} className={page === id ? 'active' : ''} onClick={() => navigate(id)}>{label}</button>)}</nav>
+      {error && !modal && <div className="status-message error-message" role="alert"><span>{error}</span><button className="text-button" onClick={refresh}>Повторить загрузку</button></div>}
+      <PageView page={page}>
+        {state && <>
+          {page === 'dashboard' && <Dashboard state={state} actions={actions} busy={busy} go={navigate} />}
+          {page === 'operations' && <Operations transactions={state.transactions} remove={actions.remove} busy={busy} open={() => setModal(true)} />}
+          {page === 'recurring' && <><div className="page-title"><span className="section-kicker">Ваши обязательства</span><h1>Повторяющиеся платежи</h1><p>Проверьте предложения и будьте готовы к следующей оплате.</p></div><Reminders state={state} /><div className="recurring-layout"><Suggestions items={state.suggestions} review={actions.review} busy={busy} today={state.today} /><Subscriptions state={state} update={actions.update} remove={actions.removeSubscription} busy={busy} /></div></>}
+          {page === 'analytics' && <Analytics state={state} />}
+          {page === 'settings' && <SettingsPage state={state} busy={busy} save={value => mutate('/profile', 'PATCH', value, 'Настройки сохранены.')} importLocal={transactions => mutate('/import-local', 'POST', { transactions }, 'История перенесена в базу данных.')} onAuthResult={data => { revision.current++; applyState(data); }} onLogout={logout} onSecurityBusy={authBusy} />}
+        </>}
+      </PageView>
+    </main>
+    <Toast message={notice} dismiss={() => setNotice('')} />
+    <Modal open={modal && Boolean(state)} onClose={() => setModal(false)} busy={busy} label="Новая операция" error={error}>
+      {state && <TransactionForm save={actions.add} close={() => setModal(false)} busy={busy} today={state.today} />}
+    </Modal>
+  </div>;
 }

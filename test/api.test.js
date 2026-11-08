@@ -11,7 +11,11 @@ async function setup(t, store=createStore(':memory:')) {
   const {server}=createApp({store,clock:()=> '2026-11-01'});server.listen(0,'127.0.0.1');await once(server,'listening');
   t.after(async()=>{server.closeAllConnections();await new Promise(r=>server.close(r));store.close();});
   const base=`http://127.0.0.1:${server.address().port}`;
-  function client(){let cookie='';return async(path,method='GET',body)=>{const response=await fetch(base+'/api'+path,{method,headers:{...(body===undefined?{}:{'Content-Type':'application/json'}),...(cookie?{Cookie:cookie}:{})},body:body===undefined?undefined:JSON.stringify(body)});if(response.headers.get('set-cookie'))cookie=response.headers.get('set-cookie').split(';')[0];return {status:response.status,data:await response.json(),cookie};};}
+  let clientNumber=0;
+  function client(){let cookie='',csrf='',registered=false;const number=++clientNumber;return async function api(path,method='GET',body){
+    if(!registered){registered=true;await api('/auth/register','POST',{name:'Айгерим',email:`test-${number}@example.com`,password:'A long test password 2026!'});}
+    const response=await fetch(base+'/api'+path,{method,headers:{'X-Monetra-Request':'1',...(body===undefined?{}:{'Content-Type':'application/json'}),...(cookie?{Cookie:cookie}:{}),...(csrf?{'X-CSRF-Token':csrf}:{})},body:body===undefined?undefined:JSON.stringify(body)});
+    if(response.headers.get('set-cookie'))cookie=response.headers.get('set-cookie').split(';')[0];const data=await response.json();if(data.csrfToken)csrf=data.csrfToken;return {status:response.status,data,cookie};};}
   return {client,store,base};
 }
 const payment=(date='2026-10-03T12:00',extra={})=>({name:'StreamBox',amount:-3000,category:'Подписки',occurredAt:date,...extra});

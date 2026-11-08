@@ -13,8 +13,20 @@ export function createStore(path = 'data/monetra.sqlite') {
     CREATE INDEX IF NOT EXISTS tx_user ON transactions(user_id, occurred_at);
     CREATE TABLE IF NOT EXISTS decisions (user_id TEXT NOT NULL REFERENCES users(id), pattern_key TEXT NOT NULL, status TEXT NOT NULL, PRIMARY KEY(user_id,pattern_key));
     CREATE TABLE IF NOT EXISTS subscriptions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), pattern_key TEXT NOT NULL, name TEXT NOT NULL, amount_minor INTEGER NOT NULL, next_date TEXT NOT NULL, anchor_day INTEGER NOT NULL, reminder_enabled INTEGER NOT NULL DEFAULT 1, UNIQUE(user_id,pattern_key));`);
+  // Additive migration preserves existing anonymous profiles and all finance records.
+  const columns = new Set(db.prepare('PRAGMA table_info(users)').all().map(x => x.name));
+  for (const [name, type] of [['email', 'TEXT'], ['password_hash', 'TEXT'], ['recovery_hash', 'TEXT']]) {
+    if (!columns.has(name)) db.exec(`ALTER TABLE users ADD COLUMN ${name} ${type}`);
+  }
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users(email) WHERE email IS NOT NULL;
+    CREATE TABLE IF NOT EXISTS sessions (
+      token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, last_seen INTEGER NOT NULL, idle_ms INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
+    CREATE TABLE IF NOT EXISTS auth_limits (key TEXT PRIMARY KEY, attempts INTEGER NOT NULL, reset_at INTEGER NOT NULL);`);
   const atomic = (fn) => { db.exec('BEGIN IMMEDIATE'); try { const result=fn(); db.exec('COMMIT'); return result; } catch(e) { db.exec('ROLLBACK'); throw e; } };
-  const user = (id) => db.prepare('SELECT id,name,reminder_days AS reminderDays FROM users WHERE id=?').get(id);
+  const user = (id) => db.prepare('SELECT id,name,email,reminder_days AS reminderDays FROM users WHERE id=?').get(id);
   const transactions = (id) => db.prepare('SELECT id,name,amount_minor AS amountMinor,category,occurred_at AS occurredAt,note FROM transactions WHERE user_id=? ORDER BY occurred_at DESC,id').all(id);
   const subscriptions = (id) => db.prepare("SELECT id,name,amount_minor / 100.0 AS price,next_date AS nextDate,anchor_day AS anchorDay,reminder_enabled AS reminderEnabled,'confirmed' AS status FROM subscriptions WHERE user_id=? ORDER BY next_date,name").all(id);
   function suggestions(id) {
@@ -50,5 +62,5 @@ export function createStore(path = 'data/monetra.sqlite') {
     const profile = user(id);
     return { profile, today, transactions:tx.map(x=>({...x,amount:x.amountMinor/100,recurring:x.amountMinor<0 && subs.some(s=>merchantKey(s.name)===merchantKey(x.name) && Math.round(s.price*100)===Math.abs(x.amountMinor))})), subscriptions:subs, suggestions:suggestions(id), reminders:eligibleReminders(subs.filter(x=>x.reminderEnabled),profile.reminderDays,today), forecastTotal:subs.filter(x=>validDate(x.nextDate) && dayDifference(x.nextDate,today)>=0 && dayDifference(x.nextDate,today)<=30).reduce((sum,x)=>sum+Math.round(x.price*100),0)/100 };
   }
-  return { db, atomic, user, transactions, subscriptions, suggestions, confirm, add, state, createUser:()=>{const id=randomUUID();db.prepare('INSERT INTO users(id) VALUES(?)').run(id);return id;}, close:()=>db.close() };
+  return { db, atomic, user, transactions, subscriptions, suggestions, confirm, add, state, createUser:()=>{const id=randomUUID();db.prepare('INSERT INTO users(id,name) VALUES(?,?)').run(id,'Айгерим');return id;}, close:()=>db.close() };
 }
